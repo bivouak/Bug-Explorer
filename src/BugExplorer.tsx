@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 
-type DirStat = {
+type FileData = {
+  path: string
+  date: string
   count: number
   isDirectory: boolean
 }
 
-const processFiles = (files: string[], basePath: string): { [key: string]: DirStat } => {
+const processFiles = (files: FileData[], basePath: string, since: Date): { [key: string]: DirStat } => {
   const directories = {}
 
-  files.forEach((file: string) => {
-    if (!file.startsWith(basePath)) return
+  files.forEach((file: FileData) => {
+    const fileDate = new Date(file.date)
+    if (fileDate < since) return // Skip files before selected date
+    
+    if (!file.path.startsWith(basePath)) return
 
-    const relativePath = file.slice(basePath.length)
+    const relativePath = file.path.slice(basePath.length)
     const parts = relativePath.split('/').filter(p => p)
 
     if (parts.length > 0) {
@@ -41,16 +46,22 @@ const getColorForPercentage = (count: number, total: number): string => {
 const BugExplorer = () => {
   const [currentPath, setCurrentPath] = useState<string>('')
   const fileStatsPath = '/bugs.csv'
-
-  const [files, setFiles] = useState<string[]>([])
+  const [files, setFiles] = useState<FileData[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [sinceDate, setSinceDate] = useState<Date>(new Date(0))
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const content = await fetch(fileStatsPath).then(r => r.blob()).then((b) => b.text())
-
-        setFiles(content.split('\n').filter(line => line.trim()))
+        const fileData = content
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            const [path, date] = line.split(',')
+            return { path, date, count: 0, isDirectory: false }
+          })
+        setFiles(fileData)
       } catch (error) {
         console.error('Error loading file:', error)
       } finally {
@@ -61,7 +72,10 @@ const BugExplorer = () => {
     loadData()
   }, [fileStatsPath])
 
-  const currentDirs = useMemo(() => processFiles(files, currentPath), [files, currentPath])
+  const currentDirs = useMemo(() => 
+    processFiles(files, currentPath, sinceDate),
+    [files, currentPath, sinceDate]
+  )
 
   const navigateToDir = (dir: string) => {
     setCurrentPath((cp) => cp + dir + '/')
@@ -83,23 +97,37 @@ const BugExplorer = () => {
     )
   }
 
-  const command = `git log --all --pretty=format:"%H" --grep="BUGS-[0-9]" | while read commit; do
-  git show --pretty="" --name-only $commit | grep -v "^test"
+  const command = `git log --all --pretty=format:"%H,%aI" --grep="BUGS-[0-9]" | while IFS=, read hash date; do
+  git show --pretty="" --name-only $hash | grep -v "^test" | while read file; do
+    echo "$file,$date"
+  done
 done > bugs.csv`;
 
-const totalBugs = Object.values(currentDirs).reduce((sum, dir) => sum + dir.count, 0);
+  const totalBugs = Object.values(currentDirs).reduce((sum, dir) => sum + dir.count, 0);
 
   return (
     <div className="p-4 bg-white">
       <div className="mb-4">
         <h2 className="text-xl font-bold mb-2">Bug Analysis by Directory</h2>
 
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Show commits since:
+            <input
+              type="date"
+              onChange={(e) => setSinceDate(new Date(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </label>
+        </div>
+
         <p>Run the following command to generate stats</p>
         <pre className="text-white bg-black p-6 rounded-xl my-2">
           <code>{command}</code>
         </pre>
 
-        <p className="bg-sky-200 p-2 rounded-lg text-sm text-sky-900 my-2">This command lists all the files modified by commits having a message matching <code>BUGS-</code> pattern.<br/>
+        <p className="bg-sky-200 p-2 rounded-lg text-sm text-sky-900 my-2">
+          This command lists all the files modified by commits having a message matching <code>BUGS-</code> pattern.<br/>
           <code>test/</code> directory is excluded.
         </p>
 
@@ -124,13 +152,16 @@ const totalBugs = Object.values(currentDirs).reduce((sum, dir) => sum + dir.coun
           .map(([name, data]) => (
             <button
               key={name}
-              onClick={() => navigateToDir(name)}
+              onClick={() => data.isDirectory && navigateToDir(name)}
               className={`text-left p-4 rounded border hover:bg-gray-50 flex justify-between items-center ${
-                getColorForPercentage(data.count, totalBugs)
-              }`}
+                data.isDirectory ? 'hover:bg-gray-50 cursor-pointer' : ''
+              } ${getColorForPercentage(data.count, totalBugs)}`}
             >
               <span className="font-medium">{name}/</span>
-              <span className="px-2 py-1 rounded text-sm">
+              <span className="text-gray-700">
+                {data.isDirectory ? '📁' : '📄'} {name}
+              </span>
+              <span className="bg-blue-100 px-2 py-1 rounded text-sm">
                 {data.count} bugs ({((data.count / totalBugs) * 100).toFixed(1)}%)
               </span>
             </button>
