@@ -30,6 +30,14 @@ const processFiles = (files: string[], basePath: string): { [key: string]: DirSt
   return directories
 }
 
+const getColorForPercentage = (count: number, total: number): string => {
+  const percentage = (count / total) * 100;
+  if (percentage >= 75) return 'bg-red-100 text-red-800';
+  if (percentage >= 50) return 'bg-orange-100 text-orange-800';
+  if (percentage >= 25) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-green-100 text-green-800';
+}
+
 const BugExplorer = () => {
   const [currentPath, setCurrentPath] = useState<string>('')
   const fileStatsPath = '/bugs.csv'
@@ -79,6 +87,8 @@ const BugExplorer = () => {
   git show --pretty="" --name-only $commit | grep -v "^test"
 done > bugs.csv`;
 
+const totalBugs = Object.values(currentDirs).reduce((sum, dir) => sum + dir.count, 0);
+
   return (
     <div className="p-4 bg-white">
       <div className="mb-4">
@@ -114,14 +124,14 @@ done > bugs.csv`;
           .map(([name, data]) => (
             <button
               key={name}
-              onClick={() => data.isDirectory && navigateToDir(name)}
-              className={`text-left p-4 rounded border flex justify-between items-center ${data.isDirectory ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
+              onClick={() => navigateToDir(name)}
+              className={`text-left p-4 rounded border hover:bg-gray-50 flex justify-between items-center ${
+                getColorForPercentage(data.count, totalBugs)
+              }`}
             >
-              <span className="text-gray-700">
-                {data.isDirectory ? '📁' : '📄'} {name}
-              </span>
-              <span className="bg-blue-100 px-2 py-1 rounded text-sm">
-                {data.count} bugs
+              <span className="font-medium">{name}/</span>
+              <span className="px-2 py-1 rounded text-sm">
+                {data.count} bugs ({((data.count / totalBugs) * 100).toFixed(1)}%)
               </span>
             </button>
           ))}
