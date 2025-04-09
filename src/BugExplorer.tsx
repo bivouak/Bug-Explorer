@@ -6,7 +6,7 @@ type DirStat = {
 }
 
 const processFiles = (files: string[], basePath: string): { [key: string]: DirStat } => {
-  const directories = {}
+  const directories: { [key: string]: DirStat } = {}
 
   files.forEach((file: string) => {
     if (!file.startsWith(basePath)) return
