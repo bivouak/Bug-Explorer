@@ -5,25 +5,13 @@ type DirStat = {
   isDirectory: boolean
 }
 
-type FileData = {
-  path: string
-  date: string
-}
+const processFiles = (files: string[], basePath: string): { [key: string]: DirStat } => {
+  const directories: { [key: string]: DirStat } = {}
 
-type DirectoryMap = {
-  [key: string]: DirStat
-}
+  files.forEach((file: string) => {
+    if (!file.startsWith(basePath)) return
 
-const processFiles = (files: FileData[], basePath: string, since: Date): DirectoryMap => {
-  const directories: DirectoryMap = {}
-
-  files.forEach((file: FileData) => {
-    const fileDate = new Date(file.date)
-    if (fileDate < since) return
-    
-    if (!file.path.startsWith(basePath)) return
-
-    const relativePath = file.path.slice(basePath.length)
+    const relativePath = file.slice(basePath.length)
     const parts = relativePath.split('/').filter(p => p)
 
     if (parts.length > 0) {
