@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 
-type FileData = {
-  path: string
-  date: string
+type DirStat = {
   count: number
   isDirectory: boolean
 }
 
-const processFiles = (files: FileData[], basePath: string, since: Date): { [key: string]: DirStat } => {
-  const directories = {}
+type FileData = {
+  path: string
+  date: string
+}
+
+type DirectoryMap = {
+  [key: string]: DirStat
+}
+
+const processFiles = (files: FileData[], basePath: string, since: Date): DirectoryMap => {
+  const directories: DirectoryMap = {}
 
   files.forEach((file: FileData) => {
     const fileDate = new Date(file.date)
-    if (fileDate < since) return // Skip files before selected date
+    if (fileDate < since) return
     
     if (!file.path.startsWith(basePath)) return
 
@@ -59,7 +66,7 @@ const BugExplorer = () => {
           .filter(line => line.trim())
           .map(line => {
             const [path, date] = line.split(',')
-            return { path, date, count: 0, isDirectory: false }
+            return { path, date }
           })
         setFiles(fileData)
       } catch (error) {
@@ -112,7 +119,7 @@ done > bugs.csv`;
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Show commits since:
+            Show bugs since:
             <input
               type="date"
               onChange={(e) => setSinceDate(new Date(e.target.value))}
@@ -157,7 +164,6 @@ done > bugs.csv`;
                 data.isDirectory ? 'hover:bg-gray-50 cursor-pointer' : ''
               } ${getColorForPercentage(data.count, totalBugs)}`}
             >
-              <span className="font-medium">{name}/</span>
               <span className="text-gray-700">
                 {data.isDirectory ? '📁' : '📄'} {name}
               </span>
